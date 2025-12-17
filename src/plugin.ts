@@ -186,9 +186,6 @@ async function persistAccountPool(
       projectId: parts.projectId ?? existing.projectId,
       managedProjectId: parts.managedProjectId ?? existing.managedProjectId,
       lastUsed: now,
-      // Reset rate limit state when token is refreshed
-      isRateLimited: false,
-      rateLimitResetTime: 0,
     };
     
     // Update the token index if the token changed
