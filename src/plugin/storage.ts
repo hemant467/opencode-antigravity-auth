@@ -2,35 +2,19 @@ import { promises as fs } from "node:fs";
 import { dirname, join } from "node:path";
 import { homedir } from "node:os";
 
-/**
- * Metadata for a stored OAuth account.
- */
 export interface AccountMetadata {
-  /** The email address associated with this account (used for deduplication). */
   email?: string;
-  /** The OAuth refresh token for this account. */
   refreshToken: string;
-  /** The Google Cloud project ID associated with this account. */
   projectId?: string;
-  /** The managed project ID returned by Antigravity loadCodeAssist. */
   managedProjectId?: string;
-  /** Timestamp (ms) when this account was first added. */
   addedAt: number;
-  /** Timestamp (ms) when this account was last used for a request. */
   lastUsed: number;
-  /** Whether this account is currently rate-limited. */
   isRateLimited?: boolean;
-  /** Timestamp (ms) when the rate limit resets. */
   rateLimitResetTime?: number;
 }
 
-/**
- * Storage format for persisted account data.
- */
 export interface AccountStorage {
-  /** Storage format version. */
   version: 1;
-  /** Array of stored account metadata. */
   accounts: AccountMetadata[];
   /**
    * Rotation cursor (next index to start from).
@@ -40,11 +24,6 @@ export interface AccountStorage {
   activeIndex: number;
 }
 
-/**
- * Returns the platform-specific configuration directory for opencode.
- * On Windows: %APPDATA%\opencode
- * On Unix-like systems: $XDG_CONFIG_HOME/opencode or ~/.config/opencode
- */
 function getConfigDir(): string {
   const platform = process.platform;
   if (platform === "win32") {
@@ -55,9 +34,6 @@ function getConfigDir(): string {
   return join(xdgConfig, "opencode");
 }
 
-/**
- * Returns the full path to the antigravity-accounts.json storage file.
- */
 export function getStoragePath(): string {
   return join(getConfigDir(), "antigravity-accounts.json");
 }
@@ -65,9 +41,6 @@ export function getStoragePath(): string {
 /**
  * Deduplicates accounts by email, keeping only the most recent entry for each email.
  * Accounts without email are kept as-is (no deduplication possible).
- * 
- * @param accounts - Array of account metadata to deduplicate
- * @returns Deduplicated array with only the newest account per email address
  */
 export function deduplicateAccountsByEmail(accounts: AccountMetadata[]): AccountMetadata[] {
   const emailToNewestIndex = new Map<string, number>();
@@ -131,14 +104,6 @@ export function deduplicateAccountsByEmail(accounts: AccountMetadata[]): Account
   return result;
 }
 
-/**
- * Loads account storage from disk.
- * 
- * Reads the antigravity-accounts.json file, validates its format,
- * deduplicates accounts by email, and clamps the activeIndex to valid range.
- * 
- * @returns The loaded and validated account storage, or null if file doesn't exist or is invalid
- */
 export async function loadAccounts(): Promise<AccountStorage | null> {
   try {
     const path = getStoragePath();
@@ -181,14 +146,6 @@ export async function loadAccounts(): Promise<AccountStorage | null> {
   }
 }
 
-/**
- * Saves account storage to disk.
- * 
- * Creates the config directory if it doesn't exist and writes the
- * storage data as formatted JSON.
- * 
- * @param storage - The account storage data to persist
- */
 export async function saveAccounts(storage: AccountStorage): Promise<void> {
   const path = getStoragePath();
   await fs.mkdir(dirname(path), { recursive: true });
@@ -197,11 +154,6 @@ export async function saveAccounts(storage: AccountStorage): Promise<void> {
   await fs.writeFile(path, content, "utf-8");
 }
 
-/**
- * Clears all stored accounts by deleting the storage file.
- * 
- * Silently succeeds if the file doesn't exist. Logs errors for other failures.
- */
 export async function clearAccounts(): Promise<void> {
   try {
     const path = getStoragePath();
