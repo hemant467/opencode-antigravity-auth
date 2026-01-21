@@ -324,9 +324,19 @@ export class AccountManager {
     this.currentAccountIndexByFamily[family] = account.index;
   }
 
+  /**
+   * Check if we should show an account switch toast.
+   * Debounces ALL account toasts (not just same account) to prevent toast spam
+   * when hybrid mode is recalculating frequently.
+   */
   shouldShowAccountToast(accountIndex: number, debounceMs = 30000): boolean {
     const now = nowMs();
-    if (accountIndex === this.lastToastAccountIndex && now - this.lastToastTime < debounceMs) {
+    // Debounce ANY toast, not just same account - prevents spam on rapid switching
+    if (now - this.lastToastTime < debounceMs) {
+      return false;
+    }
+    // Also skip if same account (no actual switch)
+    if (accountIndex === this.lastToastAccountIndex) {
       return false;
     }
     return true;
