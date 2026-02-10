@@ -66,6 +66,7 @@ export async function initAntigravityVersion(): Promise<void> {
     } else {
       // 3. Fall back to hardcoded
       source = "fallback";
+      setAntigravityVersion(fallback);
       log.info("version-fetch-failed", { fallback });
       return;
     }

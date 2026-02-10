@@ -72,10 +72,19 @@ export const ANTIGRAVITY_DEFAULT_PROJECT_ID = "rising-fact-p41fc";
 
 const ANTIGRAVITY_VERSION_FALLBACK = "1.15.8";
 let antigravityVersion = ANTIGRAVITY_VERSION_FALLBACK;
+let versionLocked = false;
 
 export function getAntigravityVersion(): string { return antigravityVersion; }
 
-export function setAntigravityVersion(version: string): void { antigravityVersion = version; }
+/**
+ * Set the runtime Antigravity version. Can only be called once (at startup).
+ * Subsequent calls are silently ignored to prevent accidental mutation.
+ */
+export function setAntigravityVersion(version: string): void {
+  if (versionLocked) return;
+  antigravityVersion = version;
+  versionLocked = true;
+}
 
 /** @deprecated Use getAntigravityVersion() for runtime access. */
 export const ANTIGRAVITY_VERSION = ANTIGRAVITY_VERSION_FALLBACK;
