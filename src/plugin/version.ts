@@ -29,17 +29,18 @@ function parseVersion(text: string): string | null {
 }
 
 async function tryFetchVersion(url: string, maxChars?: number): Promise<string | null> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
   try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
     const response = await fetch(url, { signal: controller.signal });
-    clearTimeout(timeout);
     if (!response.ok) return null;
     let text = await response.text();
     if (maxChars) text = text.slice(0, maxChars);
     return parseVersion(text);
   } catch {
     return null;
+  } finally {
+    clearTimeout(timeout);
   }
 }
 
