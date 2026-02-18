@@ -1,11 +1,12 @@
 /**
  * Model Resolution with Thinking Tier Support
  * 
- * Resolves model names with tier suffixes (e.g., gemini-3-pro-high, claude-sonnet-4-5-thinking-low)
+ * Resolves model names with tier suffixes (e.g., gemini-3-pro-high, claude-opus-4-6-thinking-low)
  * to their actual API model names and corresponding thinking configurations.
  */
 
 import type { ResolvedModel, ThinkingTier, GoogleSearchConfig } from "./types";
+import { logToast } from "../debug.ts";
 
 export interface ModelResolverOptions {
   cli_first?: boolean;
@@ -47,16 +48,19 @@ export const MODEL_ALIASES: Record<string, string> = {
   "gemini-3-flash-high": "gemini-3-flash",
 
   // Claude proxy names (gemini- prefix for compatibility)
-  "gemini-claude-sonnet-4-5": "claude-sonnet-4-5",
-  "gemini-claude-sonnet-4-5-thinking-low": "claude-sonnet-4-5-thinking",
-  "gemini-claude-sonnet-4-5-thinking-medium": "claude-sonnet-4-5-thinking",
-  "gemini-claude-sonnet-4-5-thinking-high": "claude-sonnet-4-5-thinking",
-  "gemini-claude-opus-4-5-thinking-low": "claude-opus-4-5-thinking",
-  "gemini-claude-opus-4-5-thinking-medium": "claude-opus-4-5-thinking",
-  "gemini-claude-opus-4-5-thinking-high": "claude-opus-4-5-thinking",
   "gemini-claude-opus-4-6-thinking-low": "claude-opus-4-6-thinking",
   "gemini-claude-opus-4-6-thinking-medium": "claude-opus-4-6-thinking",
   "gemini-claude-opus-4-6-thinking-high": "claude-opus-4-6-thinking",
+  "gemini-claude-sonnet-4-6": "claude-sonnet-4-6",
+
+  // Deprecated Claude 4.5 aliases → forwarded to 4.6 equivalents
+  "gemini-claude-sonnet-4-5": "claude-sonnet-4-6",
+  "gemini-claude-sonnet-4-5-thinking-low": "claude-opus-4-6-thinking",
+  "gemini-claude-sonnet-4-5-thinking-medium": "claude-opus-4-6-thinking",
+  "gemini-claude-sonnet-4-5-thinking-high": "claude-opus-4-6-thinking",
+  "gemini-claude-opus-4-5-thinking-low": "claude-opus-4-6-thinking",
+  "gemini-claude-opus-4-5-thinking-medium": "claude-opus-4-6-thinking",
+  "gemini-claude-opus-4-5-thinking-high": "claude-opus-4-6-thinking",
 
   // Image generation models - only gemini-3-pro-image is available via Antigravity API
   // Note: gemini-2.5-flash-image (Nano Banana) is NOT supported by Antigravity - only Google AI API
@@ -68,8 +72,30 @@ export const MODEL_ALIASES: Record<string, string> = {
  * NOTE: Image models should NOT fall back to non-image models!
  */
 export const MODEL_FALLBACKS: Record<string, string> = {
-  // No fallbacks for image models - they must stay as image models
+  // Deprecated Claude 4.5 bare-name fallbacks → 4.6 equivalents
+  "claude-sonnet-4-5": "claude-sonnet-4-6",
+  "claude-sonnet-4-5-thinking": "claude-opus-4-6-thinking",
+  "claude-opus-4-5-thinking": "claude-opus-4-6-thinking",
 };
+
+/**
+ * Deprecated model names that trigger a user-facing deprecation warning.
+ * Includes both MODEL_ALIASES keys and MODEL_FALLBACKS keys for 4.5 models.
+ */
+const DEPRECATED_MODELS = new Set([
+  // Bare-name fallbacks
+  "claude-sonnet-4-5",
+  "claude-sonnet-4-5-thinking",
+  "claude-opus-4-5-thinking",
+  // Gemini-prefixed aliases
+  "gemini-claude-sonnet-4-5",
+  "gemini-claude-sonnet-4-5-thinking-low",
+  "gemini-claude-sonnet-4-5-thinking-medium",
+  "gemini-claude-sonnet-4-5-thinking-high",
+  "gemini-claude-opus-4-5-thinking-low",
+  "gemini-claude-opus-4-5-thinking-medium",
+  "gemini-claude-opus-4-5-thinking-high",
+]);
 
 const TIER_REGEX = /-(minimal|low|medium|high)$/;
 const QUOTA_PREFIX_REGEX = /^antigravity-/i;
@@ -153,7 +179,7 @@ function isThinkingCapableModel(model: string): boolean {
  * - "gemini-2.5-flash" → { quotaPreference: "antigravity" }
  * - "gemini-3-pro-preview" → { quotaPreference: "antigravity" }
  * - "antigravity-gemini-3-pro-high" → { quotaPreference: "antigravity", explicitQuota: true }
- * - "claude-sonnet-4-5-thinking-medium" → { quotaPreference: "antigravity" }
+ * - "claude-opus-4-6-thinking-medium" → { quotaPreference: "antigravity" }
  *
  * @param requestedModel - The model name from the request
  * @param options - Optional configuration including cli_first preference
@@ -198,6 +224,16 @@ export function resolveModelWithTier(requestedModel: string, options: ModelResol
     : MODEL_ALIASES[modelWithoutQuota] || MODEL_ALIASES[baseName] || baseName;
 
   const resolvedModel = MODEL_FALLBACKS[actualModel] || actualModel;
+
+  // Emit deprecation warning for deprecated model names (4.5 → 4.6 redirects)
+  if (DEPRECATED_MODELS.has(modelWithoutQuota) || DEPRECATED_MODELS.has(baseName)) {
+    logToast(
+      `Model "${requestedModel}" is deprecated. Using "${resolvedModel}" instead. ` +
+      `Please update your configuration to use "${resolvedModel}" directly.`,
+      "warning"
+    )
+  }
+
   const isThinking = isThinkingCapableModel(resolvedModel);
 
   // Image generation models don't support thinking - return early without thinking config

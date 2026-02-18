@@ -63,6 +63,11 @@ export const OPENCODE_MODEL_DEFINITIONS: OpencodeModelDefinitions = {
     limit: { context: 200000, output: 64000 },
     modalities: DEFAULT_MODALITIES,
   },
+  "antigravity-claude-sonnet-4-6": {
+    name: "Claude Sonnet 4.6 (Antigravity)",
+    limit: { context: 200000, output: 64000 },
+    modalities: DEFAULT_MODALITIES,
+  },
   "antigravity-claude-sonnet-4-5-thinking": {
     name: "Claude Sonnet 4.5 Thinking (Antigravity)",
     limit: { context: 200000, output: 64000 },

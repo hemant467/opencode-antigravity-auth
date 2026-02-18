@@ -19,6 +19,7 @@ describe("OPENCODE_MODEL_DEFINITIONS", () => {
       "antigravity-claude-opus-4-6-thinking",
       "antigravity-claude-sonnet-4-5",
       "antigravity-claude-sonnet-4-5-thinking",
+      "antigravity-claude-sonnet-4-6",
       "antigravity-gemini-3-flash",
       "antigravity-gemini-3-pro",
       "gemini-2.5-flash",

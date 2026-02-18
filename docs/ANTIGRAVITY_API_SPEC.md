@@ -79,6 +79,7 @@ Accept: text/event-stream
 | Model Name | Model ID | Type | Status |
 |------------|----------|------|--------|
 | Claude Sonnet 4.5 | `claude-sonnet-4-5` | Anthropic | ✅ Verified |
+| Claude Sonnet 4.6 | `claude-sonnet-4-6` | Anthropic | ✅ Verified |
 | Claude Sonnet 4.5 Thinking | `claude-sonnet-4-5-thinking` | Anthropic | ✅ Verified |
 | Claude Opus 4.5 Thinking | `claude-opus-4-5-thinking` | Anthropic | ✅ Verified |
 | Claude Opus 4.6 Thinking | `claude-opus-4-6-thinking` | Anthropic | ⏳ Pending |
