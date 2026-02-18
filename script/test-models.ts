@@ -20,13 +20,6 @@ const MODELS: ModelTest[] = [
 
   // Antigravity Claude
   { model: "google/antigravity-claude-sonnet-4-6", category: "antigravity-claude" },
-  { model: "google/antigravity-claude-sonnet-4-6", category: "antigravity-claude" },
-  { model: "google/antigravity-claude-opus-4-6-thinking-low", category: "antigravity-claude" },
-  { model: "google/antigravity-claude-opus-4-6-thinking-medium", category: "antigravity-claude" },
-  { model: "google/antigravity-claude-opus-4-6-thinking-high", category: "antigravity-claude" },
-  { model: "google/antigravity-claude-opus-4-6-thinking-low", category: "antigravity-claude" },
-  { model: "google/antigravity-claude-opus-4-6-thinking-medium", category: "antigravity-claude" },
-  { model: "google/antigravity-claude-opus-4-6-thinking-high", category: "antigravity-claude" },
   { model: "google/antigravity-claude-opus-4-6-thinking-low", category: "antigravity-claude" },
   { model: "google/antigravity-claude-opus-4-6-thinking-medium", category: "antigravity-claude" },
   { model: "google/antigravity-claude-opus-4-6-thinking-high", category: "antigravity-claude" },

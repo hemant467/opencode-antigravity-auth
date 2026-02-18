@@ -150,9 +150,9 @@ For Gemini 3 models, the old `thinkingBudget` format is still supported but depr
 
 ---
 
-## Backward Compatibility
+## Tier-Suffixed Names
 
-Legacy model names still work:
+Tier-suffixed model names are still accepted:
 
 - `antigravity-claude-opus-4-6-thinking-low`
 - `antigravity-claude-opus-4-6-thinking-medium`
@@ -166,7 +166,7 @@ However, **we recommend using simplified model names with variants** for:
 
 - **Cleaner model picker** — 7 models instead of 12+
 - **Simpler config** — No need to configure both `antigravity-` and `-preview` versions
-- **Automatic quota fallback** — Plugin handles model name transformation
+- **Automatic quota routing** — Plugin handles model name transformation
 - **Flexible budgets** — Define any budget, not just preset tiers
 - **Future-proof** — Works with OpenCode's native variant system
 

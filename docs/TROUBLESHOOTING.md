@@ -390,7 +390,7 @@ v1.2.8+ introduces **model variants** for dynamic thinking configuration.
 }
 ```
 
-Old tier-suffixed models still work for backward compatibility.
+Use canonical model names from current docs. Deprecated model names are sent as requested and may fail if the upstream API has removed them.
 
 ### v1.2.7 (Prefix)
 
@@ -401,7 +401,7 @@ v1.2.7+ uses explicit `antigravity-` prefix:
 | `gemini-3-pro-low` | `antigravity-gemini-3-pro` |
 | `claude-sonnet-4-6` | `antigravity-claude-sonnet-4-6` |
 
-Old names work as fallback, but `antigravity-` prefix is recommended.
+Use the `antigravity-` prefixed model names shown above.
 
 ---
 
