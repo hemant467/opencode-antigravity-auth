@@ -725,7 +725,7 @@ export function prepareAntigravityRequest(
 
         const conversationKey = resolveConversationKeyFromRequests(requestObjects);
         // Strip tier suffix from model for cache key to prevent cache misses on tier change
-        // e.g., "claude-opus-4-5-thinking-high" -> "claude-opus-4-5-thinking"
+        // e.g., "claude-opus-4-6-thinking-high" -> "claude-opus-4-6-thinking"
         const modelForCacheKey = effectiveModel.replace(/-(minimal|low|medium|high)$/i, "");
         signatureSessionKey = buildSignatureSessionKey(PLUGIN_SESSION_ID, modelForCacheKey, conversationKey, resolveProjectKey(parsedBody.project));
 
@@ -827,7 +827,7 @@ export function prepareAntigravityRequest(
         // For Claude Sonnet non-thinking variants (without -thinking suffix), ignore client's thinkingConfig
         // Only claude-sonnet-*-thinking-* variants should have thinking enabled
         const lowerEffective = effectiveModel.toLowerCase();
-        const isClaudeSonnetNonThinking = lowerEffective === "claude-sonnet-4-5" || lowerEffective === "claude-sonnet-4-6";
+        const isClaudeSonnetNonThinking = lowerEffective === "claude-sonnet-4-6";
         const effectiveUserThinkingConfig = (isClaudeSonnetNonThinking || isImageModel) ? undefined : userThinkingConfig;
 
         // For image models, add imageConfig instead of thinkingConfig
