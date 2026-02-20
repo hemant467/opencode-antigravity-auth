@@ -3,6 +3,15 @@ import { join } from "node:path";
 import { homedir } from "node:os";
 import { env } from "node:process";
 import type { AntigravityConfig } from "./config";
+import {
+  deriveDebugPolicy,
+  formatAccountContextLabel,
+  formatAccountLabel,
+  formatBodyPreviewForLog,
+  formatErrorForLog,
+  isTruthyFlag,
+  truncateTextForLog,
+} from "./logging-utils";
 import { ensureGitignoreSync } from "./storage";
 
 const MAX_BODY_PREVIEW_CHARS = 12000;
@@ -24,17 +33,6 @@ interface DebugState {
 }
 
 let debugState: DebugState | null = null;
-
-/**
- * Parse debug level from a flag string.
- * 0 = off, 1 = basic, 2 = verbose (full bodies)
- */
-function parseDebugLevel(flag: string): number {
-  const trimmed = flag.trim();
-  if (trimmed === "2" || trimmed === "verbose") return 2;
-  if (trimmed === "1" || trimmed === "true") return 1;
-  return 0;
-}
 
 /**
  * Get the OS-specific config directory.
@@ -133,10 +131,13 @@ function createLogWriter(filePath?: string): (line: string) => void {
 export function initializeDebug(config: AntigravityConfig): void {
   // Config takes precedence, but env var can force enable for debugging
   const envDebugFlag = env.OPENCODE_ANTIGRAVITY_DEBUG ?? "";
-  const debugLevel = config.debug ? (envDebugFlag === "2" || envDebugFlag === "verbose" ? 2 : 1) : parseDebugLevel(envDebugFlag);
-  const debugEnabled = debugLevel >= 1;
-  const verboseEnabled = debugLevel >= 2;
-  const debugTuiEnabled = config.debug_tui || env.OPENCODE_ANTIGRAVITY_DEBUG_TUI === "1" || env.OPENCODE_ANTIGRAVITY_DEBUG_TUI === "true";
+  const { debugLevel, debugEnabled, verboseEnabled } = deriveDebugPolicy({
+    configDebug: config.debug,
+    configDebugTui: config.debug_tui,
+    envDebugFlag,
+    envDebugTuiFlag: env.OPENCODE_ANTIGRAVITY_DEBUG_TUI,
+  });
+  const debugTuiEnabled = config.debug_tui || isTruthyFlag(env.OPENCODE_ANTIGRAVITY_DEBUG_TUI);
   const logFilePath = debugEnabled ? createLogFilePath(config.log_dir) : undefined;
   const logWriter = createLogWriter(logFilePath);
 
@@ -161,11 +162,13 @@ export function initializeDebug(config: AntigravityConfig): void {
 function getDebugState(): DebugState {
   if (!debugState) {
     // Fallback to env-based initialization for backward compatibility
-    const envDebugFlag = env.OPENCODE_ANTIGRAVITY_DEBUG ?? "";
-    const debugLevel = parseDebugLevel(envDebugFlag);
-    const debugEnabled = debugLevel >= 1;
-    const verboseEnabled = debugLevel >= 2;
-    const debugTuiEnabled = env.OPENCODE_ANTIGRAVITY_DEBUG_TUI === "1" || env.OPENCODE_ANTIGRAVITY_DEBUG_TUI === "true";
+    const { debugLevel, debugEnabled, verboseEnabled } = deriveDebugPolicy({
+      configDebug: false,
+      configDebugTui: false,
+      envDebugFlag: env.OPENCODE_ANTIGRAVITY_DEBUG,
+      envDebugTuiFlag: env.OPENCODE_ANTIGRAVITY_DEBUG_TUI,
+    });
+    const debugTuiEnabled = isTruthyFlag(env.OPENCODE_ANTIGRAVITY_DEBUG_TUI);
     const logFilePath = debugEnabled ? createLogFilePath() : undefined;
     const logWriter = createLogWriter(logFilePath);
 
@@ -246,7 +249,7 @@ export function startAntigravityDebugRequest(meta: AntigravityDebugRequestMeta):
   }
   logDebug(`[Antigravity Debug ${id}] Streaming: ${meta.streaming ? "yes" : "no"}`);
   logDebug(`[Antigravity Debug ${id}] Headers: ${JSON.stringify(maskHeaders(meta.headers))}`);
-  const bodyPreview = formatBodyPreview(meta.body);
+  const bodyPreview = formatBodyPreviewForLog(meta.body, MAX_BODY_PREVIEW_CHARS);
   if (bodyPreview) {
     logDebug(`[Antigravity Debug ${id}] Body Preview: ${bodyPreview}`);
   }
@@ -282,12 +285,12 @@ export function logAntigravityDebugResponse(
   }
 
   if (meta.error) {
-    logDebug(`[Antigravity Debug ${context.id}] Error: ${formatError(meta.error)}`);
+    logDebug(`[Antigravity Debug ${context.id}] Error: ${formatErrorForLog(meta.error)}`);
   }
 
   if (meta.body) {
     logDebug(
-      `[Antigravity Debug ${context.id}] Response Body Preview: ${truncateForLog(meta.body)}`,
+      `[Antigravity Debug ${context.id}] Response Body Preview: ${truncateTextForLog(meta.body, MAX_BODY_PREVIEW_CHARS)}`,
     );
   }
 }
@@ -313,61 +316,15 @@ function maskHeaders(headers?: HeadersInit | Headers): Record<string, string> {
 }
 
 /**
- * Produces a short, type-aware preview of a request/response body for logs.
- */
-function formatBodyPreview(body?: BodyInit | null): string | undefined {
-  if (body == null) {
-    return undefined;
-  }
-
-  if (typeof body === "string") {
-    return truncateForLog(body);
-  }
-
-  if (body instanceof URLSearchParams) {
-    return truncateForLog(body.toString());
-  }
-
-  if (typeof Blob !== "undefined" && body instanceof Blob) {
-    return `[Blob size=${body.size}]`;
-  }
-
-  if (typeof FormData !== "undefined" && body instanceof FormData) {
-    return "[FormData payload omitted]";
-  }
-
-  return `[${body.constructor?.name ?? typeof body} payload omitted]`;
-}
-
-/**
- * Truncates long strings to a fixed preview length for logging.
- */
-function truncateForLog(text: string): string {
-  if (text.length <= MAX_BODY_PREVIEW_CHARS) {
-    return text;
-  }
-  return `${text.slice(0, MAX_BODY_PREVIEW_CHARS)}... (truncated ${text.length - MAX_BODY_PREVIEW_CHARS} chars)`;
-}
-
-/**
  * Writes a single debug line using the configured writer.
  */
 function logDebug(line: string): void {
   getDebugState().logWriter(line);
 }
 
-/**
- * Converts unknown error-like values into printable strings.
- */
-function formatError(error: unknown): string {
-  if (error instanceof Error) {
-    return error.stack ?? error.message;
-  }
-  try {
-    return JSON.stringify(error);
-  } catch {
-    return String(error);
-  }
+function runWithDebugEnabled(action: () => void): void {
+  if (!getDebugState().debugEnabled) return;
+  action();
 }
 
 export interface AccountDebugInfo {
@@ -379,32 +336,28 @@ export interface AccountDebugInfo {
 }
 
 export function logAccountContext(label: string, info: AccountDebugInfo): void {
-  if (!getDebugState().debugEnabled) return;
+  runWithDebugEnabled(() => {
+    const accountLabel = formatAccountContextLabel(info.email, info.index);
 
-  const accountLabel = info.email
-    ? info.email
-    : info.index >= 0
-      ? `Account ${info.index + 1}`
-      : "All accounts";
+    const indexLabel = info.index >= 0 ? `${info.index + 1}/${info.totalAccounts}` : `-/${info.totalAccounts}`;
 
-  const indexLabel = info.index >= 0 ? `${info.index + 1}/${info.totalAccounts}` : `-/${info.totalAccounts}`;
-
-  let rateLimitInfo = "";
-  if (info.rateLimitState && Object.keys(info.rateLimitState).length > 0) {
-    const now = Date.now();
-    const activeRateLimits: Record<string, string> = {};
-    for (const [key, resetTime] of Object.entries(info.rateLimitState)) {
-      if (typeof resetTime === "number" && resetTime > now) {
-        const remainingSec = Math.ceil((resetTime - now) / 1000);
-        activeRateLimits[key] = `${remainingSec}s`;
+    let rateLimitInfo = "";
+    if (info.rateLimitState && Object.keys(info.rateLimitState).length > 0) {
+      const now = Date.now();
+      const activeRateLimits: Record<string, string> = {};
+      for (const [key, resetTime] of Object.entries(info.rateLimitState)) {
+        if (typeof resetTime === "number" && resetTime > now) {
+          const remainingSec = Math.ceil((resetTime - now) / 1000);
+          activeRateLimits[key] = `${remainingSec}s`;
+        }
+      }
+      if (Object.keys(activeRateLimits).length > 0) {
+        rateLimitInfo = ` rateLimits=${JSON.stringify(activeRateLimits)}`;
       }
     }
-    if (Object.keys(activeRateLimits).length > 0) {
-      rateLimitInfo = ` rateLimits=${JSON.stringify(activeRateLimits)}`;
-    }
-  }
 
-  logDebug(`[Account] ${label}: ${accountLabel} (${indexLabel}) family=${info.family}${rateLimitInfo}`);
+    logDebug(`[Account] ${label}: ${accountLabel} (${indexLabel}) family=${info.family}${rateLimitInfo}`);
+  });
 }
 
 export function logRateLimitEvent(
@@ -415,40 +368,42 @@ export function logRateLimitEvent(
   retryAfterMs: number,
   bodyInfo: { message?: string; quotaResetTime?: string; retryDelayMs?: number | null; reason?: string },
 ): void {
-  if (!getDebugState().debugEnabled) return;
-  const accountLabel = email || `Account ${accountIndex + 1}`;
-  logDebug(`[RateLimit] ${status} on ${accountLabel} family=${family} retryAfterMs=${retryAfterMs}`);
-  if (bodyInfo.message) {
-    logDebug(`[RateLimit] message: ${bodyInfo.message}`);
-  }
-  if (bodyInfo.quotaResetTime) {
-    logDebug(`[RateLimit] quotaResetTime: ${bodyInfo.quotaResetTime}`);
-  }
-  if (bodyInfo.retryDelayMs !== undefined && bodyInfo.retryDelayMs !== null) {
-    logDebug(`[RateLimit] body retryDelayMs: ${bodyInfo.retryDelayMs}`);
-  }
-  if (bodyInfo.reason) {
-    logDebug(`[RateLimit] reason: ${bodyInfo.reason}`);
-  }
+  runWithDebugEnabled(() => {
+    const accountLabel = formatAccountLabel(email, accountIndex);
+    logDebug(`[RateLimit] ${status} on ${accountLabel} family=${family} retryAfterMs=${retryAfterMs}`);
+    if (bodyInfo.message) {
+      logDebug(`[RateLimit] message: ${bodyInfo.message}`);
+    }
+    if (bodyInfo.quotaResetTime) {
+      logDebug(`[RateLimit] quotaResetTime: ${bodyInfo.quotaResetTime}`);
+    }
+    if (bodyInfo.retryDelayMs !== undefined && bodyInfo.retryDelayMs !== null) {
+      logDebug(`[RateLimit] body retryDelayMs: ${bodyInfo.retryDelayMs}`);
+    }
+    if (bodyInfo.reason) {
+      logDebug(`[RateLimit] reason: ${bodyInfo.reason}`);
+    }
+  });
 }
 
 export function logRateLimitSnapshot(
   family: string,
   accounts: Array<{ index: number; email?: string; rateLimitResetTimes?: { claude?: number; gemini?: number } }>,
 ): void {
-  if (!getDebugState().debugEnabled) return;
-  const now = Date.now();
-  const entries = accounts.map((account) => {
-    const label = account.email ? account.email : `Account ${account.index + 1}`;
-    const reset = account.rateLimitResetTimes?.[family as "claude" | "gemini"];
-    if (typeof reset !== "number") {
-      return `${label}=ready`;
-    }
-    const remaining = Math.max(0, reset - now);
-    const seconds = Math.ceil(remaining / 1000);
-    return `${label}=wait ${seconds}s`;
+  runWithDebugEnabled(() => {
+    const now = Date.now();
+    const entries = accounts.map((account) => {
+      const label = formatAccountLabel(account.email, account.index);
+      const reset = account.rateLimitResetTimes?.[family as "claude" | "gemini"];
+      if (typeof reset !== "number") {
+        return `${label}=ready`;
+      }
+      const remaining = Math.max(0, reset - now);
+      const seconds = Math.ceil(remaining / 1000);
+      return `${label}=wait ${seconds}s`;
+    });
+    logDebug(`[RateLimit] snapshot family=${family} ${entries.join(" | ")}`);
   });
-  logDebug(`[RateLimit] snapshot family=${family} ${entries.join(" | ")}`);
 }
 
 export async function logResponseBody(
@@ -467,25 +422,25 @@ export async function logResponseBody(
   try {
     const text = await response.clone().text();
     const maxChars = state.verboseEnabled ? MAX_BODY_VERBOSE_CHARS : MAX_BODY_PREVIEW_CHARS;
-    const preview = text.length <= maxChars 
-      ? text 
-      : `${text.slice(0, maxChars)}... (truncated ${text.length - maxChars} chars)`;
+    const preview = truncateTextForLog(text, maxChars);
     logDebug(`[Antigravity Debug ${context.id}] Response Body (${status}): ${preview}`);
     return text;
   } catch (e) {
-    logDebug(`[Antigravity Debug ${context.id}] Failed to read response body: ${formatError(e)}`);
+    logDebug(`[Antigravity Debug ${context.id}] Failed to read response body: ${formatErrorForLog(e)}`);
     return undefined;
   }
 }
 
 export function logModelFamily(url: string, extractedModel: string | null, family: string): void {
-  if (!getDebugState().debugEnabled) return;
-  logDebug(`[ModelFamily] url=${url} model=${extractedModel ?? "unknown"} family=${family}`);
+  runWithDebugEnabled(() => {
+    logDebug(`[ModelFamily] url=${url} model=${extractedModel ?? "unknown"} family=${family}`);
+  });
 }
 
 export function debugLogToFile(message: string): void {
-  if (!getDebugState().debugEnabled) return;
-  logDebug(message);
+  runWithDebugEnabled(() => {
+    logDebug(message);
+  });
 }
 
 /**
@@ -493,9 +448,10 @@ export function debugLogToFile(message: string): void {
  * This helps correlate what the user saw with debug events.
  */
 export function logToast(message: string, variant: "info" | "warning" | "success" | "error"): void {
-  if (!getDebugState().debugEnabled) return;
-  const variantLabel = variant.toUpperCase();
-  logDebug(`[Toast/${variantLabel}] ${message}`);
+  runWithDebugEnabled(() => {
+    const variantLabel = variant.toUpperCase();
+    logDebug(`[Toast/${variantLabel}] ${message}`);
+  });
 }
 
 /**
@@ -508,10 +464,11 @@ export function logRetryAttempt(
   reason: string,
   delayMs?: number,
 ): void {
-  if (!getDebugState().debugEnabled) return;
-  const delayInfo = delayMs !== undefined ? ` delay=${delayMs}ms` : "";
-  const maxInfo = maxAttempts < 0 ? "∞" : maxAttempts.toString();
-  logDebug(`[Retry] Attempt ${attempt}/${maxInfo} reason=${reason}${delayInfo}`);
+  runWithDebugEnabled(() => {
+    const delayInfo = delayMs !== undefined ? ` delay=${delayMs}ms` : "";
+    const maxInfo = maxAttempts < 0 ? "∞" : maxAttempts.toString();
+    logDebug(`[Retry] Attempt ${attempt}/${maxInfo} reason=${reason}${delayInfo}`);
+  });
 }
 
 /**
@@ -523,12 +480,13 @@ export function logCacheStats(
   cacheWriteTokens: number,
   totalInputTokens: number,
 ): void {
-  if (!getDebugState().debugEnabled) return;
-  const cacheHitRate = totalInputTokens > 0 
-    ? Math.round((cacheReadTokens / totalInputTokens) * 100) 
-    : 0;
-  const status = cacheReadTokens > 0 ? "HIT" : (cacheWriteTokens > 0 ? "WRITE" : "MISS");
-  logDebug(`[Cache] ${status} model=${model} read=${cacheReadTokens} write=${cacheWriteTokens} total=${totalInputTokens} hitRate=${cacheHitRate}%`);
+  runWithDebugEnabled(() => {
+    const cacheHitRate = totalInputTokens > 0 
+      ? Math.round((cacheReadTokens / totalInputTokens) * 100) 
+      : 0;
+    const status = cacheReadTokens > 0 ? "HIT" : (cacheWriteTokens > 0 ? "WRITE" : "MISS");
+    logDebug(`[Cache] ${status} model=${model} read=${cacheReadTokens} write=${cacheWriteTokens} total=${totalInputTokens} hitRate=${cacheHitRate}%`);
+  });
 }
 
 /**
@@ -540,11 +498,12 @@ export function logQuotaStatus(
   quotaPercent: number,
   family?: string,
 ): void {
-  if (!getDebugState().debugEnabled) return;
-  const accountLabel = accountEmail || `Account ${accountIndex + 1}`;
-  const familyInfo = family ? ` family=${family}` : "";
-  const status = quotaPercent <= 0 ? "EXHAUSTED" : quotaPercent < 20 ? "LOW" : "OK";
-  logDebug(`[Quota] ${accountLabel} remaining=${quotaPercent.toFixed(1)}% status=${status}${familyInfo}`);
+  runWithDebugEnabled(() => {
+    const accountLabel = formatAccountLabel(accountEmail, accountIndex);
+    const familyInfo = family ? ` family=${family}` : "";
+    const status = quotaPercent <= 0 ? "EXHAUSTED" : quotaPercent < 20 ? "LOW" : "OK";
+    logDebug(`[Quota] ${accountLabel} remaining=${quotaPercent.toFixed(1)}% status=${status}${familyInfo}`);
+  });
 }
 
 /**
@@ -555,10 +514,11 @@ export function logQuotaFetch(
   accountCount?: number,
   details?: string,
 ): void {
-  if (!getDebugState().debugEnabled) return;
-  const countInfo = accountCount !== undefined ? ` accounts=${accountCount}` : "";
-  const detailsInfo = details ? ` ${details}` : "";
-  logDebug(`[QuotaFetch] ${event.toUpperCase()}${countInfo}${detailsInfo}`);
+  runWithDebugEnabled(() => {
+    const countInfo = accountCount !== undefined ? ` accounts=${accountCount}` : "";
+    const detailsInfo = details ? ` ${details}` : "";
+    logDebug(`[QuotaFetch] ${event.toUpperCase()}${countInfo}${detailsInfo}`);
+  });
 }
 
 /**
@@ -569,11 +529,12 @@ export function logModelUsed(
   actualModel: string,
   accountEmail?: string,
 ): void {
-  if (!getDebugState().debugEnabled) return;
-  const accountInfo = accountEmail ? ` account=${accountEmail}` : "";
-  if (requestedModel !== actualModel) {
-    logDebug(`[Model] requested=${requestedModel} actual=${actualModel}${accountInfo}`);
-  } else {
-    logDebug(`[Model] ${actualModel}${accountInfo}`);
-  }
+  runWithDebugEnabled(() => {
+    const accountInfo = accountEmail ? ` account=${accountEmail}` : "";
+    if (requestedModel !== actualModel) {
+      logDebug(`[Model] requested=${requestedModel} actual=${actualModel}${accountInfo}`);
+    } else {
+      logDebug(`[Model] ${actualModel}${accountInfo}`);
+    }
+  });
 }
