@@ -6,11 +6,11 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![X (Twitter)](https://img.shields.io/badge/X-@dopesalmon-000000?style=flat&logo=x)](https://x.com/dopesalmon)
 
-Enable Opencode to authenticate against **Antigravity** (Google's IDE) via OAuth so you can use Antigravity rate limits and access models like `gemini-3-pro` and `claude-opus-4-6-thinking` with your Google credentials.
+Enable Opencode to authenticate against **Antigravity** (Google's IDE) via OAuth so you can use Antigravity rate limits and access models like `gemini-3.1-pro` and `claude-opus-4-6-thinking` with your Google credentials.
 
 ## What You Get
 
-- **Claude Opus 4.6, Sonnet 4.6** and **Gemini 3 Pro/Flash** via Google OAuth
+- **Claude Opus 4.6, Sonnet 4.6** and **Gemini 3.1 Pro/Flash** via Google OAuth
 - **Multi-account support** — add multiple Google accounts, auto-rotates when rate-limited
 - **Dual quota system** — access both Antigravity and Gemini CLI quotas from one plugin
 - **Thinking models** — extended thinking for Claude and Gemini 3 with configurable budgets
@@ -24,18 +24,13 @@ Enable Opencode to authenticate against **Antigravity** (Google's IDE) via OAuth
 <summary><b>⚠️ Terms of Service Warning — Read Before Installing</b></summary>
 
 > [!CAUTION]
-> Using this plugin may violate Google's Terms of Service. A small number of users have reported their Google accounts being **banned** or **shadow-banned** (restricted access without explicit notification).
->
-> **High-risk scenarios:**
-> - 🚨 **Fresh Google accounts** have a very high chance of getting banned
-> - 🚨 **New accounts with Pro/Ultra subscriptions** are frequently flagged and banned
+> Using this plugin (and any proxy for antgravity) violate Google's Terms of Service. A number of users have reported their Google accounts being **banned** or **shadow-banned** (restricted access without explicit notification).
 >
 > **By using this plugin, you acknowledge:**
 > - This is an unofficial tool not endorsed by Google
 > - Your account may be suspended or permanently banned
 > - You assume all risks associated with using this plugin
 >
-> **Recommendation:** Use an established Google account that you don't rely on for critical services. Avoid creating new accounts specifically for this plugin.
 
 </details>
 
@@ -73,7 +68,7 @@ Install the opencode-antigravity-auth plugin and add the Antigravity model defin
    ```
 
 3. **Add models** — choose one:
-   - Run `opencode auth login` → select **"Configure models in opencode.json"** (auto-configures all models)
+   - Run `opencode auth login` → Google → OAuth with Google (Antigravity) → select **"Configure models in opencode.json"** (auto-configures all models)
    - Or manually copy the [full configuration](#models) below
 
 4. **Use it:**
